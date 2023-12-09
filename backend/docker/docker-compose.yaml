@@ -1,0 +1,13 @@
+services:
+
+  postgres:
+    build:
+      context: postgres
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_MULTIPLE_DATABASES: fmi
+    ports:
+      - "5432:5432"

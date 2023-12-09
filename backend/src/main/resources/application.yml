@@ -1,0 +1,64 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    banner-mode: off
+  application:
+    name: API-FMI
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hephaestus
+    driveClassName: org.postgresql.Driver
+    username: admin
+    password: admin
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: filesystem:flyway/db
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/demo
+          jwk-set-uri: http://localhost:8080/auth/realms/demo/protocol/openid-connect/certs
+  jpa:
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        show_sql: true
+#        hbm2ddl:
+#          auto: create-drop
+
+#keycloak:
+#  auth-server-url: http://localhost:8080/auth
+#  realm: demo
+#  ssl-required: external
+#  resource: app-backend
+#  bearer-only: true
+server:
+  port: 8085
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: admin
+  secret-key: adminadmin
+  bucket-name: clothes
+
+keycloak:
+  auth-server-url: http://localhost:8080/auth/
+  realm: demo
+  resource: resource-spring
+  credentials:
+    secret: xr9U2kbAP6A4gGVjX4Kzy7EGrueQHQ6H
+  security-constraints:
+    - authRoles:
+        - user
+      securityCollections:
+        - patterns:
+            - /*
+  cors: true
+
+
+
+phython:
+  server-url: http://127.0.0.1:8000
+
