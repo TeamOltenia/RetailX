@@ -1,0 +1,10 @@
+#!/bin/sh
+
+echo "Importing master.."
+/opt/bitnami/keycloak/bin/kc.sh import --dir=/import/master --override true 2>/dev/null 
+
+echo "Importing dev-realm.."
+/opt/bitnami/keycloak/bin/kc.sh import --dir=/import/dev-realm --override true 2>/dev/null
+
+### Resume normal execution
+/opt/bitnami/scripts/keycloak/run.sh

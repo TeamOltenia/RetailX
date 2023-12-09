@@ -1,0 +1,52 @@
+services:
+
+  postgres:
+    build:
+      context: postgres
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_MULTIPLE_DATABASES: retailX,keycloak
+    ports:
+      - "5432:5432"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:19.0.3-legacy
+    container_name: keycloak
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+      DB_USER: admin
+      DB_SCHEMA: public
+      DB_PASSWORD: admin
+
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+
+      # KEYCLOAK_IMPORT: /tmp/realm-export.json
+
+    # volumes:
+    #   - ./realm-export.json:/tmp/realm-export.json
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      - postgres
+
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: minio
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     MINIO_ROOT_USER: admin
+  #     MINIO_ROOT_PASSWORD: adminadmin
+  #   command: server /data
+  #   volumes:
+  #     - /Users/ioancristianlefter/Faculta/licenta/docker/docker v2/files:/data
+
+
+    
