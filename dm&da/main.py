@@ -1,59 +1,93 @@
-# import tensorflow as tf
-import ssl
-
-import app
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import numpy as np
-from typing import Dict
+from sklearn.ensemble import IsolationForest
 import matplotlib.pyplot as plt
 
-import numpy as np
-from fastapi import  FastAPI, Form, HTTPException
-from PIL import Image
-import sys
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
-from pydantic import BaseModel
-import aiosmtplib
-import asyncio
-from smtplib import SMTP
+sales_doc = "../doccuments/sales_and_eodStocks.xlsx"
+transactions_doc = "../doccuments/transactions.xlsx"
 
+sales_df = pd.read_excel(sales_doc)
+sales_df['Product_ID'] = sales_df['Product_ID'].astype(str)
+transactions_sales_df = pd.read_excel(transactions_doc)
+print(sales_df.head())
+from fastapi.encoders import jsonable_encoder
+import json
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NumpyEncoder, self).default(obj)
+
+
+
+# Step 4: Labeling Anomalies
+def label_anomalies(row, too_much_stock_threshold, too_small_stock_threshold, not_enough_stock_threshold):
+    if row['StockDiff'] > too_much_stock_threshold:
+        return 'Too Much Stock'
+    elif row['StockDiff'] < too_small_stock_threshold:
+        return 'Too Small Stock'
+    elif row['EndOfDayStock'] < not_enough_stock_threshold:
+        return 'Not Enough Stock'
+    else:
+        return 'Normal'
 
 app = FastAPI()
 
-@app.post("/send_email")
-async def send_email(to_email: str = Form(...), subject: str = Form(...), message: str = Form(...)):
-    # Set your Yahoo email credentials
-    sender_email = "fazalunga200@yahoo.com"
-    sender_password = "ParolaSerioasa10."  # replace with your Yahoo password
 
-    # Compose the email
-    msg = MIMEText(message)
-    msg['Subject'] = subject
-    msg['From'] = sender_email
-    msg['To'] = to_email
+@app.get("/sales/{start_date}/{end_date}/{product_id}")
+async def get_sales(start_date: str, end_date: str, product_id: str):
+    product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
+    return product_data
 
-    try:
-        # Connect to the SMTP server
-        with smtplib.SMTP("smtp.mail.yahoo.com", 587) as server:
-            server.starttls()
-            # Log in to your Yahoo email account
-            server.login(sender_email, sender_password)
-            # Send the email
-            server.sendmail(sender_email, to_email, msg.as_string())
 
-        return {"message": "Email sent successfully"}
+@app.get("/sales/anomaly/{start_date}/{end_date}/{product_id}")
+async def get_anomaly_sales(start_date: str, end_date: str, product_id: str):
+    print(sales_df.head())
+    product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+    product_data = product_data.sort_values(by=['Product_ID', 'Date'])
 
-@app.get("/classify/")
-async def classify_image(image_url: str) -> str:
-    pass
+    # Step 2: Feature Engineering
+    # Calculate StockDiff as the difference in stock levels between consecutive days within the same product
+    product_data['StockDiff'] = product_data.groupby('Product_ID')['EndOfDayStock'].diff()
+    product_data = product_data.dropna(subset=['Product_ID', 'StockDiff', 'EndOfDayStock'])
+
+    # Adjusted quantile values for "Normal" classification
+    too_much_stock_threshold = product_data['EndOfDayStock'].quantile(0.95)
+    too_small_stock_threshold = product_data['EndOfDayStock'].quantile(0.05)
+    not_enough_stock_threshold = product_data['EndOfDayStock'].quantile(0.25)
+    print(too_much_stock_threshold, too_small_stock_threshold, not_enough_stock_threshold)
+
+    # Step 3: Define Anomalies
+    product_data['Anomaly'] = product_data.apply(lambda row: label_anomalies(row, too_much_stock_threshold, too_small_stock_threshold, not_enough_stock_threshold), axis=1)
+
+    # Step 5: Machine Learning Model (Isolation Forest)
+    X = product_data[['EndOfDayStock', 'StockDiff']]  # Remove 'Date' column
+
+    model = IsolationForest(contamination=0.05)
+    model.fit(X)
+
+    # Step 6: Anomaly Detection
+    product_data['AnomalyDetection'] = model.predict(X)
+    # Step 7: Visualization
+    anomalies = product_data[product_data['AnomalyDetection'] == -1]
+    print(anomalies)
+    return anomalies.to_json(orient="records")
+
+
+
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="127.0.0.1", port=8000)
