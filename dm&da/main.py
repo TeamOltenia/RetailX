@@ -3,6 +3,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import numpy as np
 from sklearn.ensemble import IsolationForest
 import matplotlib.pyplot as plt
+from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
@@ -43,17 +44,30 @@ def label_anomalies(row, too_much_stock_threshold, too_small_stock_threshold, no
         return 'Normal'
 
 app = FastAPI()
+origins = [
+    "http://localhost.tiangolo.com",
+    "https://localhost.tiangolo.com",
+    "http://localhost",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/sales/{start_date}/{end_date}/{product_id}")
 async def get_sales(start_date: str, end_date: str, product_id: str):
     product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
-    return product_data
+    return product_data.to_json(orient="records")
 
 
 @app.get("/sales/anomaly/{start_date}/{end_date}/{product_id}")
 async def get_anomaly_sales(start_date: str, end_date: str, product_id: str):
-    print(sales_df.head())
     product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
 
     product_data = product_data.sort_values(by=['Product_ID', 'Date'])
