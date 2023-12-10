@@ -15,6 +15,7 @@ sales_doc = "../doccuments/sales_and_eodStocks.xlsx"
 transactions_doc = "../doccuments/transactions.xlsx"
 
 sales_df = pd.read_excel(sales_doc)
+df_csv = pd.read_csv('sales_data.csv')
 sales_df['Product_ID'] = sales_df['Product_ID'].astype(str)
 transactions_sales_df = pd.read_excel(transactions_doc)
 print(sales_df.head())
@@ -153,6 +154,71 @@ async def get_sales(start_date: str, end_date: str, product_id: str):
         'Average Revenue per Sale': float(average_revenue_per_sale)
     }
     return json.dumps(metrics)
+
+def predict_sales(product_id, date, model, label_encoder):
+    # Convert date to datetime
+    date = pd.to_datetime(date)
+
+    # Extract year, month, and day
+    year = date.year
+    month = date.month
+    day = date.day
+
+    # Encode Product_ID
+    encoded_product_id = label_encoder.transform([product_id])[0]
+
+    # Create DataFrame for the prediction
+    df_pred = pd.DataFrame({'Product_ID_Encoded': [encoded_product_id],
+                            'Year': [year], 'Month': [month], 'Day': [day]})
+
+    # Make prediction
+    predicted_sales = model.predict(df_pred)[0]
+
+    return predicted_sales
+
+@app.get("/sales/predictions/{product_id_to_predict}/{year}/{start_month}/{end_month}")
+def get_predictions(product_id_to_predict,year,start_month,end_month):
+
+    df_csv['Date'] = pd.to_datetime(df_csv['Date'])
+
+
+    # Extract year, month, and day from 'Date'
+    df_csv['Year'] = df_csv['Date'].dt.year
+    df_csv['Month'] = df_csv['Date'].dt.month
+    df_csv['Day'] = df_csv['Date'].dt.day
+
+    label_encoder = LabelEncoder()
+    df_csv['Product_ID_Encoded'] = label_encoder.fit_transform(df_csv['Product_ID'].astype(str))
+
+    # Select features and target
+    X = df_csv[['Product_ID_Encoded', 'Year', 'Month', 'Day']]
+    y = df_csv['Sales']
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    model = XGBRegressor(objective='reg:squarederror', n_estimators=100, learning_rate=0.1)
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    print(f"Mean Squared Error: {mse}")
+
+    predictions = []
+    dates = []
+
+    for month in range(start_month, end_month + 1):
+        # Number of days in the month
+        num_days = pd.Period(f'{year}-{month}').days_in_month
+
+        # Generate predictions every three days in the month
+        for day in range(1, num_days + 1, 3):  # Increment by 3
+            date_str = f'{year}-{month:02d}-{day:02d}'  # Format the date as YYYY-MM-DD
+            prediction = predict_sales(product_id_to_predict, date_str, model, label_encoder)
+            predictions.append(prediction)
+            dates.append(date_str)
+
+    return json.dumps({"dates" : dates, "predictions" : predictions})
+
 
 if __name__ == "__main__":
     import uvicorn
