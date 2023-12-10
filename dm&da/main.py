@@ -48,7 +48,7 @@ origins = [
     "http://localhost.tiangolo.com",
     "https://localhost.tiangolo.com",
     "http://localhost",
-    "http://localhost:8080",
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -63,7 +63,7 @@ app.add_middleware(
 @app.get("/sales/{start_date}/{end_date}/{product_id}")
 async def get_sales(start_date: str, end_date: str, product_id: str):
     product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
-    return product_data.to_json(orient="records")
+    return product_data.to_json(orient="records", date_format="iso")
 
 
 @app.get("/sales/anomaly/{start_date}/{end_date}/{product_id}")
@@ -97,10 +97,30 @@ async def get_anomaly_sales(start_date: str, end_date: str, product_id: str):
     # Step 7: Visualization
     anomalies = product_data[product_data['AnomalyDetection'] == -1]
     print(anomalies)
-    return anomalies.to_json(orient="records")
+    return anomalies.to_json(orient="records", date_format="iso")
 
 
+@app.get("/sales/metrics/{start_date}/{end_date}/{product_id}")
+async def get_sales(start_date: str, end_date: str, product_id: str):
+    product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
+    if product_data.empty:
+        return []
+    total_sales = product_data['Sales'].sum()
+    average_sales = product_data['Sales'].mean()
+    total_revenue = product_data['Revenue'].sum()
+    max_stock = product_data['EndOfDayStock'].min()
+    sales_change_percentage = product_data['Sales'].pct_change().mean() * 100
+    average_revenue_per_sale = total_revenue / total_sales
 
+    metrics = {
+        'Total Sales': float(total_sales),
+        'Average Sales': float(average_sales),
+        'Total Revenue': float(total_revenue),
+        'Maximum End of Day Stock': float(max_stock),
+        'Sales Change Percentage': float(sales_change_percentage),
+        'Average Revenue per Sale': float(average_revenue_per_sale)
+    }
+    return json.dumps(metrics)
 
 if __name__ == "__main__":
     import uvicorn

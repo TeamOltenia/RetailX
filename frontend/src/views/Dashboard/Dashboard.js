@@ -40,9 +40,10 @@ import {
   StatsIcon,
   WalletIcon,
 } from "components/Icons/Icons.js";
+import axios from "axios";
 import DashboardTableRow from "components/Tables/DashboardTableRow";
 import TimelineRow from "components/Tables/TimelineRow";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { AiFillCheckCircle } from "react-icons/ai";
 import { BiHappy } from "react-icons/bi";
 import { BsArrowRight } from "react-icons/bs";
@@ -59,10 +60,136 @@ import {
 } from "variables/charts";
 import { dashboardTableData, timelineData } from "variables/general";
 export default function Dashboard() {
+  const [sales, setSales] = useState(null);
+  const [db1, setDb1] = useState({ data: null, options: null });
+  const [db2, setDb2] = useState({ data: null, options: null });
+  const [db3, setDb3] = useState({ data: null, options: null });
+  const [metrics, setMetrics] = useState();
+  const [stockValues, setStockValues] = useState([]);
+  const [anomalies, setAnomalies] = useState([]);
+  const [inputValues, setInputValues] = useState({});
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Add your form submission logic here
+    console.log(barChartDataDashboard);
+    const startDate = e.target.elements.startDate.value;
+    const endDate = e.target.elements.endDate.value;
+    const productID = e.target.elements.productID.value;
+
+    // Update the inputValues state with the values from the form
+    setInputValues({
+      startDate,
+      endDate,
+      productID,
+    });
   };
+  console.log(metrics);
+
+  const setDashboardValues = (array, count) => {
+    if (array.length <= 13) return array;
+    const stepSize = array.length / (count - 1);
+    const distributedIndices = Array.from({ length: count }, (_, i) =>
+      Math.round(i * stepSize)
+    );
+    return distributedIndices.map((index) => array[index]);
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { startDate, endDate, productID } = inputValues;
+      console.log(startDate, endDate, productID);
+      if (
+        startDate == undefined ||
+        endDate == undefined ||
+        productID == undefined
+      )
+        return;
+      try {
+        const response_sales = await axios.get(
+          `http://127.0.0.1:8000/sales/${startDate}/${endDate}/${productID}`
+        );
+        const response_anomalies = await axios.get(
+          `http://127.0.0.1:8000/sales/anomaly/${startDate}/${endDate}/${productID}`
+        );
+        const response_metrics = await axios.get(
+          `http://127.0.0.1:8000/sales/metrics/${startDate}/${endDate}/${productID}`
+        );
+        console.log(response_metrics.data);
+        setMetrics(JSON.parse(response_metrics.data));
+        let dSales = setDashboardValues(JSON.parse(response_sales.data), 13);
+        let dAnomalies = setDashboardValues(
+          JSON.parse(response_anomalies.data),
+          13
+        );
+        let s_dates = [];
+        let a_dates = [];
+        let a_sales = [];
+        let d_sales = [];
+        let stock = [];
+        let a_stock_diff = [];
+        for (let value of dSales) {
+          if (value != undefined) {
+            const inputDate = new Date(value["Date"]);
+            const formattedDate = inputDate.toISOString().split("T")[0];
+            s_dates.push(formattedDate);
+            d_sales.push(value["Sales"]);
+            stock.push(value["EndOfDayStock"]);
+          }
+        }
+        for (let value of dAnomalies) {
+          if (value != undefined) {
+            const inputDate = new Date(value["Date"]);
+            const formattedDate = inputDate.toISOString().split("T")[0];
+            a_dates.push(formattedDate);
+            a_stock_diff.push(value["StockDiff"]);
+          }
+        }
+
+        console.log(a_dates);
+        let x = lineChartOptionsDashboard;
+        let y = lineChartOptionsDashboard;
+        let z = barChartOptionsDashboard;
+        // z["xaxis"]["categories"] = s_dates;
+        y["xaxis"]["categories"] = a_dates;
+        x["xaxis"]["categories"] = s_dates;
+        console.log(z);
+        setDb1({
+          data: [
+            {
+              name: "Sales",
+              data: d_sales,
+            },
+          ],
+          options: x,
+        });
+        setDb2({
+          data: [
+            {
+              name: "StockDiff",
+              data: a_stock_diff,
+            },
+          ],
+          options: y,
+        });
+        setDb3({
+          data: [
+            {
+              name: "Remaining_Stock",
+              data: [330, 250, 110, 300, 490, 350, 270, 130, 425],
+            },
+          ],
+          options: z,
+        });
+
+        setSales(dSales);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, [inputValues]);
+
   return (
     <Flex flexDirection="column" pt={{ base: "120px", md: "75px" }}>
       {/* <InputFormComp /> */}
@@ -87,7 +214,12 @@ export default function Dashboard() {
                     Start Date
                   </StatLabel>
                   <Flex>
-                    <Input placeholder="" size="md" color={"gray.100"} />
+                    <Input
+                      name="startDate"
+                      placeholder="2009-12-01"
+                      size="md"
+                      color={"gray.100"}
+                    />
                   </Flex>
                 </Stat>
               </Flex>
@@ -113,7 +245,12 @@ export default function Dashboard() {
                     End Date
                   </StatLabel>
                   <Flex>
-                    <Input placeholder="" size="md" color={"gray.100"} />
+                    <Input
+                      name="endDate"
+                      placeholder="2011-01-30"
+                      size="md"
+                      color={"gray.100"}
+                    />
                   </Flex>
                 </Stat>
               </Flex>
@@ -139,7 +276,12 @@ export default function Dashboard() {
                     Product ID
                   </StatLabel>
                   <Flex>
-                    <Input placeholder="" size="md" color={"gray.100"} />
+                    <Input
+                      name="productID"
+                      placeholder="10002"
+                      size="md"
+                      color={"gray.100"}
+                    />
                   </Flex>
                 </Stat>
               </Flex>
@@ -162,177 +304,249 @@ export default function Dashboard() {
         </SimpleGrid>
       </form>
       <br />
-      {/*-------------------prima componenta maree ATENTIEEEEEEEEEEEEEEEEEEEEEEE----------------------------*/}
-      <SimpleGrid columns={{ sm: 1, md: 2, xl: 4 }} spacing="24px">
-        {/* MiniStatistics Card */}
-        <Card>
-          <CardBody>
-            <Flex flexDirection="row" align="center" justify="center" w="100%">
-              <Stat me="auto">
-                <StatLabel
-                  fontSize="sm"
-                  color="gray.400"
-                  fontWeight="bold"
-                  pb="2px"
+      {sales != null && sales.length != 0 ? (
+        <div>
+          {/*-------------------prima componenta maree ATENTIEEEEEEEEEEEEEEEEEEEEEEE----------------------------*/}
+          <SimpleGrid columns={{ sm: 1, md: 2, xl: 4 }} spacing="24px">
+            {/* MiniStatistics Card */}
+            <Card>
+              <CardBody>
+                <Flex
+                  flexDirection="row"
+                  align="center"
+                  justify="center"
+                  w="100%"
                 >
-                  Today's Money
-                </StatLabel>
-                <Flex>
-                  <StatNumber fontSize="lg" color="#fff">
-                    $53,000
-                  </StatNumber>
-                  <StatHelpText
-                    alignSelf="flex-end"
-                    justifySelf="flex-end"
-                    m="0px"
-                    color="green.400"
-                    fontWeight="bold"
-                    ps="3px"
-                    fontSize="md"
-                  >
-                    +55%
-                  </StatHelpText>
+                  <Stat me="auto">
+                    <StatLabel
+                      fontSize="sm"
+                      color="gray.400"
+                      fontWeight="bold"
+                      pb="2px"
+                    >
+                      Total Sales
+                    </StatLabel>
+                    <Flex>
+                      <StatNumber fontSize="lg" color="#fff">
+                        {metrics["Total Sales"].toFixed(2)}
+                      </StatNumber>
+                      {/* <StatHelpText
+                        alignSelf="flex-end"
+                        justifySelf="flex-end"
+                        m="0px"
+                        color="green.400"
+                        fontWeight="bold"
+                        ps="3px"
+                        fontSize="md"
+                      >
+                        +55%
+                      </StatHelpText> */}
+                    </Flex>
+                  </Stat>
+                  <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
+                    <WalletIcon h={"24px"} w={"24px"} color="#fff" />
+                  </IconBox>
                 </Flex>
-              </Stat>
-              <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
-                <WalletIcon h={"24px"} w={"24px"} color="#fff" />
-              </IconBox>
-            </Flex>
-          </CardBody>
-        </Card>
-        {/* MiniStatistics Card */}
-        <Card minH="83px">
-          <CardBody>
-            <Flex flexDirection="row" align="center" justify="center" w="100%">
-              <Stat me="auto">
-                <StatLabel
-                  fontSize="sm"
-                  color="gray.400"
-                  fontWeight="bold"
-                  pb="2px"
+              </CardBody>
+            </Card>
+            {/* MiniStatistics Card */}
+            <Card minH="83px">
+              <CardBody>
+                <Flex
+                  flexDirection="row"
+                  align="center"
+                  justify="center"
+                  w="100%"
                 >
-                  Today's Users
-                </StatLabel>
-                <Flex>
-                  <StatNumber fontSize="lg" color="#fff">
-                    2,300
-                  </StatNumber>
-                  <StatHelpText
-                    alignSelf="flex-end"
-                    justifySelf="flex-end"
-                    m="0px"
-                    color="green.400"
-                    fontWeight="bold"
-                    ps="3px"
-                    fontSize="md"
-                  >
-                    +5%
-                  </StatHelpText>
+                  <Stat me="auto">
+                    <StatLabel
+                      fontSize="sm"
+                      color="gray.400"
+                      fontWeight="bold"
+                      pb="2px"
+                    >
+                      Average Sales
+                    </StatLabel>
+                    <Flex>
+                      <StatNumber fontSize="lg" color="#fff">
+                        {metrics["Average Sales"].toFixed(2)}
+                      </StatNumber>
+                      {/* <StatHelpText
+                        alignSelf="flex-end"
+                        justifySelf="flex-end"
+                        m="0px"
+                        color="green.400"
+                        fontWeight="bold"
+                        ps="3px"
+                        fontSize="md"
+                      >
+                        +5%
+                      </StatHelpText> */}
+                    </Flex>
+                  </Stat>
+                  <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
+                    <GlobeIcon h={"24px"} w={"24px"} color="#fff" />
+                  </IconBox>
                 </Flex>
-              </Stat>
-              <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
-                <GlobeIcon h={"24px"} w={"24px"} color="#fff" />
-              </IconBox>
-            </Flex>
-          </CardBody>
-        </Card>
-        {/* MiniStatistics Card */}
-        <Card>
-          <CardBody>
-            <Flex flexDirection="row" align="center" justify="center" w="100%">
-              <Stat>
-                <StatLabel
-                  fontSize="sm"
-                  color="gray.400"
-                  fontWeight="bold"
-                  pb="2px"
+              </CardBody>
+            </Card>
+            {/* MiniStatistics Card */}
+            <Card>
+              <CardBody>
+                <Flex
+                  flexDirection="row"
+                  align="center"
+                  justify="center"
+                  w="100%"
                 >
-                  New Clients
-                </StatLabel>
-                <Flex>
-                  <StatNumber fontSize="lg" color="#fff">
-                    +3,020
-                  </StatNumber>
-                  <StatHelpText
-                    alignSelf="flex-end"
-                    justifySelf="flex-end"
-                    m="0px"
-                    color="red.500"
-                    fontWeight="bold"
-                    ps="3px"
-                    fontSize="md"
-                  >
-                    -14%
-                  </StatHelpText>
+                  <Stat>
+                    <StatLabel
+                      fontSize="sm"
+                      color="gray.400"
+                      fontWeight="bold"
+                      pb="2px"
+                    >
+                      Total Revenue
+                    </StatLabel>
+                    <Flex>
+                      <StatNumber fontSize="lg" color="#fff">
+                        {metrics["Total Revenue"].toFixed(2)}
+                      </StatNumber>
+                      {/* <StatHelpText
+                        alignSelf="flex-end"
+                        justifySelf="flex-end"
+                        m="0px"
+                        color="red.500"
+                        fontWeight="bold"
+                        ps="3px"
+                        fontSize="md"
+                      >
+                        -14%
+                      </StatHelpText> */}
+                    </Flex>
+                  </Stat>
+                  <Spacer />
+                  <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
+                    <DocumentIcon h={"24px"} w={"24px"} color="#fff" />
+                  </IconBox>
                 </Flex>
-              </Stat>
-              <Spacer />
-              <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
-                <DocumentIcon h={"24px"} w={"24px"} color="#fff" />
-              </IconBox>
-            </Flex>
-          </CardBody>
-        </Card>
-        {/* MiniStatistics Card */}
-        <Card>
-          <CardBody>
-            <Flex flexDirection="row" align="center" justify="center" w="100%">
-              <Stat me="auto">
-                <StatLabel
-                  fontSize="sm"
-                  color="gray.400"
-                  fontWeight="bold"
-                  pb="2px"
+              </CardBody>
+            </Card>
+            {/* MiniStatistics Card */}
+            <Card>
+              <CardBody>
+                <Flex
+                  flexDirection="row"
+                  align="center"
+                  justify="center"
+                  w="100%"
                 >
-                  Total Sales
-                </StatLabel>
-                <Flex>
-                  <StatNumber fontSize="lg" color="#fff" fontWeight="bold">
-                    $173,000
-                  </StatNumber>
-                  <StatHelpText
-                    alignSelf="flex-end"
-                    justifySelf="flex-end"
-                    m="0px"
-                    color="green.400"
-                    fontWeight="bold"
-                    ps="3px"
-                    fontSize="md"
-                  >
-                    +8%
-                  </StatHelpText>
+                  <Stat me="auto">
+                    <StatLabel
+                      fontSize="sm"
+                      color="gray.400"
+                      fontWeight="bold"
+                      pb="2px"
+                    >
+                      Average Revenue per Sale
+                    </StatLabel>
+                    <Flex>
+                      <StatNumber fontSize="lg" color="#fff" fontWeight="bold">
+                        {metrics["Average Revenue per Sale"].toFixed(2)}
+                      </StatNumber>
+                      {/* <StatHelpText
+                        alignSelf="flex-end"
+                        justifySelf="flex-end"
+                        m="0px"
+                        color="green.400"
+                        fontWeight="bold"
+                        ps="3px"
+                        fontSize="md"
+                      >
+                        +8%
+                      </StatHelpText> */}
+                    </Flex>
+                  </Stat>
+                  <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
+                    <CartIcon h={"24px"} w={"24px"} color="#fff" />
+                  </IconBox>
                 </Flex>
-              </Stat>
-              <IconBox as="box" h={"45px"} w={"45px"} bg="brand.200">
-                <CartIcon h={"24px"} w={"24px"} color="#fff" />
-              </IconBox>
-            </Flex>
-          </CardBody>
-        </Card>
-      </SimpleGrid>
-      <br />
-      <Card p="28px 0px 0px 0px">
-        <CardHeader mb="20px" ps="22px">
-          <Flex direction="column" alignSelf="flex-start">
-            <Text fontSize="lg" color="#fff" fontWeight="bold" mb="6px">
-              Sales Overview
-            </Text>
-            <Text fontSize="md" fontWeight="medium" color="gray.400">
-              <Text as="span" color="green.400" fontWeight="bold">
-                (+5%) more
-              </Text>{" "}
-              in 2021
-            </Text>
-          </Flex>
-        </CardHeader>
-        <Box w="100%" minH={{ sm: "300px" }}>
-          <LineChart
-            lineChartData={lineChartDataDashboard}
-            lineChartOptions={lineChartOptionsDashboard}
-          />
-        </Box>
-      </Card>
-      <Grid
+              </CardBody>
+            </Card>
+          </SimpleGrid>
+          <br />
+          <Card p="28px 0px 0px 0px">
+            <CardHeader mb="20px" ps="22px">
+              <Flex direction="column" alignSelf="flex-start">
+                <Text fontSize="lg" color="#fff" fontWeight="bold" mb="6px">
+                  Sales Overview
+                </Text>
+                {/* <Text fontSize="md" fontWeight="medium" color="gray.400">
+                  <Text as="span" color="green.400" fontWeight="bold">
+                    (+5%) more
+                  </Text>{" "}
+                  in 2021
+                </Text> */}
+              </Flex>
+            </CardHeader>
+            <Box w="100%" minH={{ sm: "300px" }}>
+              <LineChart
+                lineChartData={db1["data"]}
+                lineChartOptions={db1["options"]}
+              />
+            </Box>
+            {/* <Flex direction="column" w="100%">
+              <Box
+                bg="linear-gradient(126.97deg, #060C29 28.26%, rgba(4, 12, 48, 0.5) 91.2%)"
+                borderRadius="20px"
+                display={{ sm: "flex", md: "block" }}
+                justify={{ sm: "center", md: "flex-start" }}
+                align={{ sm: "center", md: "flex-start" }}
+                minH={{ sm: "180px", md: "220px" }}
+                p={{ sm: "0px", md: "22px" }}
+              >
+                <Text fontSize="lg" color="#fff" fontWeight="bold" mb="6px">
+                  Sales Overview
+                </Text>
+                <BarChart
+                  barChartOptions={db3["data"]}
+                  barChartData={barChartOptionsDashboard}
+                />
+              </Box>
+            </Flex> */}
+          </Card>
+          <Card p="28px 0px 0px 0px">
+            <CardHeader mb="20px" ps="22px">
+              <Flex direction="column" alignSelf="flex-start">
+                <Text fontSize="lg" color="#fff" fontWeight="bold" mb="6px">
+                  Anomalies
+                </Text>
+                {/* <Text fontSize="md" fontWeight="medium" color="gray.400">
+                  <Text as="span" color="green.400" fontWeight="bold">
+                    (+5%) more
+                  </Text>{" "}
+                  in 2021
+                </Text> */}
+              </Flex>
+            </CardHeader>
+            <Box w="100%" minH={{ sm: "300px" }}>
+              <LineChart
+                lineChartData={db2["data"]}
+                lineChartOptions={db2["options"]}
+              />
+            </Box>
+          </Card>
+        </div>
+      ) : sales == null ? (
+        <Flex flexDirection="row" align="center" justify="center" w="100%">
+          <p style={{ color: "#FFF" }}>Please fill in the inputs!</p>
+        </Flex>
+      ) : (
+        <Flex flexDirection="row" align="center" justify="center" w="100%">
+          <p style={{ color: "#FFF" }}>Invalid inputs!</p>
+        </Flex>
+      )}
+      {/* <Grid
         templateColumns={{ sm: "1fr", md: "1fr 1fr", "2xl": "2fr 1.2fr 1.5fr" }}
         my="26px"
         gap="18px"
@@ -401,7 +615,7 @@ export default function Dashboard() {
             </Stack>
           </Flex>
         </Card>
-        {/* Referral Tracking */}
+        // Referral Tracking 
         <Card gridArea={{ md: "2 / 2 / 3 / 3", "2xl": "auto" }}>
           <Flex direction="column">
             <Flex justify="space-between" align="center" mb="40px">
@@ -494,14 +708,14 @@ export default function Dashboard() {
             </Flex>
           </Flex>
         </Card>
-      </Grid>
-      <Grid
+      </Grid> 
+    */}
+      {/* <Grid
         templateColumns={{ sm: "1fr", lg: "1.7fr 1.3fr" }}
         maxW={{ sm: "100%", md: "100%" }}
         gap="24px"
         mb="24px"
       >
-        {/* Sales Overview */}
         <Card p="28px 0px 0px 0px">
           <CardHeader mb="20px" ps="22px">
             <Flex direction="column" alignSelf="flex-start">
@@ -523,7 +737,7 @@ export default function Dashboard() {
             />
           </Box>
         </Card>
-        {/* Active Users */}
+        
         <Card p="16px">
           <CardBody>
             <Flex direction="column" w="100%">
@@ -690,12 +904,11 @@ export default function Dashboard() {
             </Flex>
           </CardBody>
         </Card>
-      </Grid>
-      <Grid
+      </Grid> */}
+      {/* <Grid
         templateColumns={{ sm: "1fr", md: "1fr 1fr", lg: "2fr 1fr" }}
         gap="24px"
       >
-        {/* Projects */}
         <Card p="16px" overflowX={{ sm: "scroll", xl: "hidden" }}>
           <CardHeader p="12px 0px 28px 0px">
             <Flex direction="column">
@@ -769,7 +982,6 @@ export default function Dashboard() {
             </Tbody>
           </Table>
         </Card>
-        {/* Orders Overview */}
         <Card>
           <CardHeader mb="32px">
             <Flex direction="column">
@@ -810,7 +1022,7 @@ export default function Dashboard() {
             </Flex>
           </CardBody>
         </Card>
-      </Grid>
+      </Grid> */}
     </Flex>
   );
 }
