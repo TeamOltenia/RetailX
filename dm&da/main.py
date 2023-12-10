@@ -1,6 +1,8 @@
 import httpx
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder
 import numpy as np
 from sklearn.ensemble import IsolationForest
 import matplotlib.pyplot as plt
@@ -183,6 +185,9 @@ def predict_sales(product_id, date, model, label_encoder):
     predicted_sales = model.predict(df_pred)[0]
 
     return predicted_sales
+
+
+
 
 @app.get("/sales/predictions/{product_id_to_predict}/{year}/{start_month}/{end_month}")
 def get_predictions(product_id_to_predict,year,start_month,end_month):
