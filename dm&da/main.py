@@ -1,12 +1,15 @@
+import httpx
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import numpy as np
 from sklearn.ensemble import IsolationForest
 import matplotlib.pyplot as plt
+from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 
+from starlette.responses import JSONResponse
 
 sales_doc = "../doccuments/sales_and_eodStocks.xlsx"
 transactions_doc = "../doccuments/transactions.xlsx"
@@ -43,17 +46,30 @@ def label_anomalies(row, too_much_stock_threshold, too_small_stock_threshold, no
         return 'Normal'
 
 app = FastAPI()
+origins = [
+    "http://localhost.tiangolo.com",
+    "https://localhost.tiangolo.com",
+    "http://localhost",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/sales/{start_date}/{end_date}/{product_id}")
 async def get_sales(start_date: str, end_date: str, product_id: str):
     product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
-    return product_data
+    return product_data.to_json(orient="records")
 
 
 @app.get("/sales/anomaly/{start_date}/{end_date}/{product_id}")
 async def get_anomaly_sales(start_date: str, end_date: str, product_id: str):
-    print(sales_df.head())
     product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
 
     product_data = product_data.sort_values(by=['Product_ID', 'Date'])
@@ -85,7 +101,37 @@ async def get_anomaly_sales(start_date: str, end_date: str, product_id: str):
     print(anomalies)
     return anomalies.to_json(orient="records")
 
+MAILJET_API_KEY = "17f26b0d7fd61fe07a34cdeea7f1fbac"
+MAILJET_API_SECRET = "14ea81b210dd1b904b9af8189474b2cd"
+MAILJET_API_URL = "https://api.mailjet.com/v3.1/send"
 
+@app.get("/send_email")
+async def send_email(to: str, subject: str, text: str):
+    payload = {
+        "Messages": [
+            {
+                "From": {"Email": "fazalunga404@gmail.com", "Name": "Faza Lunga"},
+                "To": [{"Email": to, "Name": to}],
+                "Subject": subject,
+                "TextPart": text,
+            }
+        ]
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            MAILJET_API_URL,
+            auth=(MAILJET_API_KEY, MAILJET_API_SECRET),
+            json=payload,
+        )
+
+        if response.status_code == 200:
+            return JSONResponse(content={"message": "Email sent successfully"})
+        else:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Failed to send email. Mailjet API response: {response.text}",
+            )
 
 
 if __name__ == "__main__":
