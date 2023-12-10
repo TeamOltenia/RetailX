@@ -82,16 +82,7 @@ export const barChartOptionsDashboard = {
   ],
 };
 
-export const lineChartDataDashboard = [
-  {
-    name: "Mobile apps",
-    data: [500, 250, 300, 220, 500, 250, 300, 230, 300, 350, 250, 400],
-  },
-  {
-    name: "Websites",
-    data: [200, 230, 300, 350, 370, 420, 550, 350, 400, 500, 330, 550],
-  },
-];
+export const lineChartDataDashboard = [];
 
 export const lineChartOptionsDashboard = {
   chart: {
@@ -150,7 +141,7 @@ export const lineChartOptionsDashboard = {
   },
   grid: {
     strokeDashArray: 5,
-    borderColor: "#56577A"
+    borderColor: "#56577A",
   },
   fill: {
     type: "gradient",
@@ -183,7 +174,6 @@ export const lineChartOptionsProfile1 = {
       show: false,
     },
     redrawOnParentResize: true,
-
   },
   tooltip: {
     theme: "dark",
@@ -239,7 +229,7 @@ export const lineChartOptionsProfile1 = {
   grid: {
     show: false,
     strokeDashArray: 5,
-    borderColor: "#56577A"
+    borderColor: "#56577A",
   },
   fill: {
     type: "gradient",
@@ -271,7 +261,7 @@ export const lineChartOptionsProfile2 = {
     toolbar: {
       show: false,
     },
-    redrawOnParentResize: true
+    redrawOnParentResize: true,
   },
   tooltip: {
     theme: "dark",
@@ -327,7 +317,7 @@ export const lineChartOptionsProfile2 = {
   grid: {
     show: false,
     strokeDashArray: 5,
-    borderColor: "#56577A"
+    borderColor: "#56577A",
   },
   fill: {
     type: "gradient",
