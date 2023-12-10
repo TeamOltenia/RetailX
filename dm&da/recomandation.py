@@ -7,20 +7,38 @@ df = pd.read_csv('transactions_sales_df.csv')
 # Handle missing data
 df.dropna(inplace=True)
 
+# Ensure correct data types (e.g., Customer_Id as string)
+df['Customer ID'] = df['Customer ID'].astype(str)
+
 # Normalize 'Price' column
 scaler = MinMaxScaler()
 df['Price'] = scaler.fit_transform(df[['Price']])
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 
 # Extract features from 'Description'
-vectorizer = TfidfVectorizer(stop_words='english')
+vectorizer = TfidfVectorizer(stop_words='english', max_features=100)
 X = vectorizer.fit_transform(df['Description'])
+
+# Reduce dimensions (optional, for better performance)
+pca = PCA(n_components=20)
+X_reduced = pca.fit_transform(X.toarray())
+
+
+from sklearn.cluster import KMeans
 
 # Cluster for category identification
 kmeans = KMeans(n_clusters=10)
-kmeans.fit(X)
+kmeans.fit(X_reduced)
+df['category'] = kmeans.labels_
+
+
+from sklearn.cluster import KMeans
+
+# Aici modifica numarul de clusetere daca vrei sa ai mai multe categori posivilie penntru obiecte
+kmeans = KMeans(n_clusters=10)
+kmeans.fit(X_reduced)
 df['category'] = kmeans.labels_
 
 # Create user profiles by aggregating data
@@ -39,9 +57,10 @@ def recommend_products(customer_id, num_recommendations=5):
 
     # Recommend products from the same category
     recommendations = similar_products.sample(n=num_recommendations)
-    return recommendations['Product_Id']
+    return recommendations['Product_ID']
 
-# Replace '12346' with a valid customer ID from your DataFrame
-# Make sure the format (string or integer) matches your DataFrame
-recommend_products('16321', 3)
 
+# Test the recommendation function
+test_customer_id = '12346'  # Replace with a valid customer ID from your DataFrame
+recommendations = recommend_products(test_customer_id, 5)
+print(recommendations)
