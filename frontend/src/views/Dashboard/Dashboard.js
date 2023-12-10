@@ -65,9 +65,60 @@ export default function Dashboard() {
   const [db2, setDb2] = useState({ data: null, options: null });
   const [db3, setDb3] = useState({ data: null, options: null });
   const [metrics, setMetrics] = useState();
+  const [customerEmail, setCustomerEmail] = useState();
+  const [customerMessages, setCustomerMessages] = useState([]);
   const [stockValues, setStockValues] = useState([]);
   const [anomalies, setAnomalies] = useState([]);
   const [inputValues, setInputValues] = useState({});
+
+  const handleCustomerSubmit = async (e) => {
+    e.preventDefault();
+    const ce = e.target.elements.customerEmail.value;
+    const ci = e.target.elements.customerId.value;
+    const lang = e.target.elements.language.value;
+    setCustomerEmail(ce);
+    const response = await axios.get(
+      `http://127.0.0.1:8000/recommendation/customer/${ci}/${ce}/${lang}`
+    );
+    const parsedObjects = response.data.map((jsonString) =>
+      JSON.parse(jsonString)
+    );
+    console.log(parsedObjects);
+    setCustomerMessages(parsedObjects);
+  };
+
+  const sendMail = async (emailContent) => {
+    const endpoint = "http://127.0.0.1:8000/send_email"; // Replace with your actual backend URL
+
+    try {
+      // Prepare data for the email
+      const emailData = {
+        to: customerMessages, // Replace with the recipient's email address
+        subject: "Promotional email",
+        text: emailContent,
+      };
+      console.log(emailData);
+      const response = await axios.get(endpoint, {
+        headers: {
+          Accept: "application/json",
+        },
+        params: emailData,
+      });
+      // Make a POST request to the backend endpoint using Axios
+      // const response = await axios.get(endpoint, emailData);
+
+      if (response.status === 200) {
+        console.log("Email sent successfully!");
+        // Optionally, you can handle a successful response, e.g., show a success message to the user
+      } else {
+        console.error("Failed to send email:", response.statusText);
+        // Optionally, you can handle the error, e.g., show an error message to the user
+      }
+    } catch (error) {
+      console.error("Error sending email:", error);
+      // Optionally, you can handle unexpected errors, e.g., show an error message to the user
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1023,6 +1074,94 @@ export default function Dashboard() {
           </CardBody>
         </Card>
       </Grid> */}
+      <Flex w="30%">
+        <form onSubmit={handleCustomerSubmit}>
+          <Stat me="auto">
+            <StatLabel
+              fontSize="sm"
+              color="gray.400"
+              fontWeight="bold"
+              pb="2px"
+            >
+              Customer email
+            </StatLabel>
+
+            <Input
+              name="customerEmail"
+              placeholder="cristi@email.com"
+              size="md"
+              color={"gray.100"}
+            />
+            <StatLabel
+              fontSize="sm"
+              color="gray.400"
+              fontWeight="bold"
+              pb="2px"
+            >
+              Customer id
+            </StatLabel>
+            <Input
+              name="customerId"
+              placeholder="12346"
+              size="md"
+              color={"gray.100"}
+            />
+            <StatLabel
+              fontSize="sm"
+              color="gray.400"
+              fontWeight="bold"
+              pb="2px"
+            >
+              Customer id
+            </StatLabel>
+            <Input
+              name="language"
+              placeholder="romanian"
+              size="md"
+              color={"gray.100"}
+            />
+          </Stat>
+          <Button
+            type="submit"
+            bg="brand.400"
+            mt={"2rem"}
+            w="100%" // Adjust the width as needed
+            mx="auto" // Centers the button horizontally
+            _hover={{
+              bg: "brand.600", // Changes the background color on hover to brand.600
+            }}
+          >
+            Generate messages
+          </Button>
+        </form>
+      </Flex>
+      <Flex direction={"column"} w="90%">
+        {customerMessages.length != 0 && (
+          <>
+            {customerMessages.map((message, index) => (
+              <Flex direction={"column"} mt="50">
+                <Text key={index} fontSize="xs" color="#fff" fontWeight="bold">
+                  {message.message}
+                </Text>
+                <Button
+                  type="submit"
+                  bg="brand.400"
+                  mt={"2rem"}
+                  w="100%" // Adjust the width as needed
+                  mx="auto" // Centers the button horizontally
+                  _hover={{
+                    bg: "brand.600", // Changes the background color on hover to brand.600
+                  }}
+                  mb="20px"
+                  onClick={() => sendMail(message.message)}
+                >
+                  Send mail
+                </Button>
+              </Flex>
+            ))}
+          </>
+        )}
+      </Flex>
     </Flex>
   );
 }
