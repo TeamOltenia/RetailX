@@ -67,7 +67,7 @@ def generate_predictions_for_period_every_three_days(product_id, year, start_mon
     predictions = []
     dates = []
 
-    for month in range(start_month, end_month + 1):
+    for month in range(int(start_month), int(end_month) + 1):
         # Number of days in the month
         num_days = pd.Period(f'{year}-{month}').days_in_month
 
