@@ -63,24 +63,30 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def generate_predictions_for_month(product_id, year, month, model, label_encoder):
-    # Number of days in the month
-    num_days = pd.Period(f'{year}-{month}').days_in_month
-
-    # Generate predictions for each day
+def generate_predictions_for_period_every_three_days(product_id, year, start_month, end_month, model, label_encoder):
     predictions = []
     dates = []
-    for day in range(1, num_days + 1):
-        date_str = f'{year}-{month}-{day}'
-        prediction = predict_sales(product_id, date_str, model, label_encoder)
-        predictions.append(prediction)
-        dates.append(date_str)
+
+    for month in range(start_month, end_month + 1):
+        # Number of days in the month
+        num_days = pd.Period(f'{year}-{month}').days_in_month
+
+        # Generate predictions every three days in the month
+        for day in range(1, num_days + 1, 3):  # Increment by 3
+            date_str = f'{year}-{month:02d}-{day:02d}'  # Format the date as YYYY-MM-DD
+            prediction = predict_sales(product_id, date_str, model, label_encoder)
+            predictions.append(prediction)
+            dates.append(date_str)
 
     return dates, predictions
 
 
-def getPredictionsPlot(product_id_to_predict,year,month):
-    dates, predictions = generate_predictions_for_month(product_id_to_predict, year, month, model, label_encoder)
+    return dates, predictions
+
+
+
+def getPredictionsPlot(product_id_to_predict,year,start_month,end_month):
+    dates, predictions = generate_predictions_for_period_every_three_days(product_id_to_predict, year, start_month,end_month, model, label_encoder)
 
     print(dates)
     print(predictions)
@@ -88,10 +94,9 @@ def getPredictionsPlot(product_id_to_predict,year,month):
     plt.figure(figsize=(12, 6))
     plt.plot(dates, predictions, marker='o')
     plt.xticks(rotation=45)
-    plt.title(f"Sales Predictions for Product ID {product_id_to_predict} in {year}-{month}")
     plt.xlabel('Date')
     plt.ylabel('Predicted Sales')
     plt.grid(True)
     plt.show()
 
-getPredictionsPlot('10002',2010,12)
+getPredictionsPlot('10002',2010,10,12)
