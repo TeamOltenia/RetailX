@@ -67,6 +67,9 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState();
   const [stockValues, setStockValues] = useState([]);
   const [anomalies, setAnomalies] = useState([]);
+
+  const [predictions, setPredictions] = useState([]);
+
   const [inputValues, setInputValues] = useState({});
 
   const handleSubmit = (e) => {
@@ -76,6 +79,19 @@ export default function Dashboard() {
     const endDate = e.target.elements.endDate.value;
     const productID = e.target.elements.productID.value;
 
+    // Parse the dates
+    const startDateTime = new Date(startDate);
+    const endDateTime = new Date(endDate);
+
+    // Extract year, start month, and end month
+    const year = startDateTime.getFullYear();
+    const start_month = startDateTime.getMonth() + 1; // Adding 1 because months are zero-based
+    const end_month = endDateTime.getMonth() + 1; // Adding 1 because months are zero-based
+
+    // Now you have the year, start month, and end month
+    console.log("Start Year:", year);
+    console.log("Start Month:", start_month);
+    console.log("End Month:", end_month);
     // Update the inputValues state with the values from the form
     setInputValues({
       startDate,
@@ -96,7 +112,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { startDate, endDate, productID } = inputValues;
+      const {
+        startDate,
+        endDate,
+        productID,
+        year,
+        start_month,
+        end_month,
+      } = inputValues;
       console.log(startDate, endDate, productID);
       if (
         startDate == undefined ||
@@ -114,19 +137,37 @@ export default function Dashboard() {
         const response_metrics = await axios.get(
           `http://127.0.0.1:8000/sales/metrics/${startDate}/${endDate}/${productID}`
         );
-        console.log(response_metrics.data);
+
+        const response_predictions = await axios.get(
+          `http://127.0.0.1:8080/sales/predictions/${productID}/${year}/${start_month}/${end_month}`
+        );
+
+        console.log("date: " + response_metrics.data);
         setMetrics(JSON.parse(response_metrics.data));
         let dSales = setDashboardValues(JSON.parse(response_sales.data), 13);
         let dAnomalies = setDashboardValues(
           JSON.parse(response_anomalies.data),
           13
         );
+
+        let dPredictions = setPredictions(
+          JSON.parse(response_predictions.data),
+          13
+        );
+
+        console.log("fd3" + dPredictions);
+
         let s_dates = [];
         let a_dates = [];
         let a_sales = [];
         let d_sales = [];
+
+        let p_dates = [];
+        let p_sales = [];
+
         let stock = [];
         let a_stock_diff = [];
+
         for (let value of dSales) {
           if (value != undefined) {
             const inputDate = new Date(value["Date"]);
@@ -144,6 +185,17 @@ export default function Dashboard() {
             a_stock_diff.push(value["StockDiff"]);
           }
         }
+
+        for (let value of dPredictions) {
+          if (value != undefined) {
+            const inputDate = new Date(value["Date"]);
+            const formattedDate = inputDate.toISOString().split("T")[0];
+            p_dates.push(formattedDate);
+            p_sales.push(value["predictions"]);
+          }
+        }
+        console.log("veecbe");
+        console.log(p_sales);
 
         console.log(a_dates);
         let x = lineChartOptionsDashboard;
@@ -179,6 +231,15 @@ export default function Dashboard() {
             },
           ],
           options: z,
+        });
+        setDb4({
+          data: [
+            {
+              name: "Predictions",
+              data: p_sales,
+            },
+          ],
+          options: y,
         });
 
         setSales(dSales);
@@ -515,6 +576,7 @@ export default function Dashboard() {
               </Box>
             </Flex> */}
           </Card>
+          <br />
           <Card p="28px 0px 0px 0px">
             <CardHeader mb="20px" ps="22px">
               <Flex direction="column" alignSelf="flex-start">
@@ -533,6 +595,28 @@ export default function Dashboard() {
               <LineChart
                 lineChartData={db2["data"]}
                 lineChartOptions={db2["options"]}
+              />
+            </Box>
+          </Card>
+          <br />
+          <Card p="28px 0px 0px 0px">
+            <CardHeader mb="20px" ps="22px">
+              <Flex direction="column" alignSelf="flex-start">
+                <Text fontSize="lg" color="#fff" fontWeight="bold" mb="6px">
+                  Predictions
+                </Text>
+                {/* <Text fontSize="md" fontWeight="medium" color="gray.400">
+                  <Text as="span" color="green.400" fontWeight="bold">
+                    (+5%) more
+                  </Text>{" "}
+                  in 2021
+                </Text> */}
+              </Flex>
+            </CardHeader>
+            <Box w="100%" minH={{ sm: "300px" }}>
+              <LineChart
+                lineChartData={db4["data"]}
+                lineChartOptions={db4["options"]}
               />
             </Box>
           </Card>
