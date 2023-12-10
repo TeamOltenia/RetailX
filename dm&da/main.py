@@ -5,7 +5,10 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 import matplotlib.pyplot as plt
 from fastapi.middleware.cors import CORSMiddleware
-
+from xgboost import XGBRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import LabelEncoder
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 
@@ -133,6 +136,8 @@ async def send_email(to: str, subject: str, text: str):
                 status_code=response.status_code,
                 detail=f"Failed to send email. Mailjet API response: {response.text}",
             )
+
+
 @app.get("/sales/metrics/{start_date}/{end_date}/{product_id}")
 async def get_sales(start_date: str, end_date: str, product_id: str):
     product_data = sales_df[(sales_df['Product_ID'] == product_id) & (sales_df['Date'] >= start_date) & (sales_df['Date'] <= end_date)].copy()
@@ -205,8 +210,8 @@ def get_predictions(product_id_to_predict,year,start_month,end_month):
 
     predictions = []
     dates = []
-
-    for month in range(start_month, end_month + 1):
+    print(start_month, end_month, type(start_month))
+    for month in range(int(start_month), int(end_month) + 1):
         # Number of days in the month
         num_days = pd.Period(f'{year}-{month}').days_in_month
 
@@ -214,7 +219,7 @@ def get_predictions(product_id_to_predict,year,start_month,end_month):
         for day in range(1, num_days + 1, 3):  # Increment by 3
             date_str = f'{year}-{month:02d}-{day:02d}'  # Format the date as YYYY-MM-DD
             prediction = predict_sales(product_id_to_predict, date_str, model, label_encoder)
-            predictions.append(prediction)
+            predictions.append(float(prediction))
             dates.append(date_str)
 
     return json.dumps({"dates" : dates, "predictions" : predictions})
