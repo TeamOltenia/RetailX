@@ -30,11 +30,12 @@ user_profile = df.groupby('Customer ID').agg({
 })
 
 def recommend_products(customer_id, num_recommendations=5):
-    if customer_id not in user_profile.index:
+    if customer_id not in user_profile['Customer ID']:
         print(f"Customer ID {customer_id} not found.")
         return None
 
     user_cat = user_profile.loc[customer_id, 'category']
+    print(user_cat)
     similar_products = df[df['category'] == user_cat]
 
     # Recommend products from the same category
@@ -43,5 +44,5 @@ def recommend_products(customer_id, num_recommendations=5):
 
 # Replace '12346' with a valid customer ID from your DataFrame
 # Make sure the format (string or integer) matches your DataFrame
-recommend_products('16321', 3)
+recommend_products('16321')
 
