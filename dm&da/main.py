@@ -326,8 +326,8 @@ def get_product_recommendation(customer_id):
     return recommendation(customer_id)
 
 
-@app.get("/recommendation/customer/{customer_id}/{customer_email}")
-def generate_emails_customer(customer_id, customer_email):
+@app.get("/recommendation/customer/{customer_id}/{customer_email}/{language}")
+def generate_emails_customer(customer_id, customer_email, language):
     
     messages = []
     recs = recommendation(customer_id)
@@ -335,7 +335,7 @@ def generate_emails_customer(customer_id, customer_email):
         print(value)
         description = get_product_name(value)
         print(description)
-        prompt = create_prompter(customer_id, 20, 'romanian', True, description, customer_email, False)
+        prompt = create_prompter(customer_id, 20, language, True, description, customer_email, False)
         print(prompt)
         response = query_openai(prompt)
         print(response)
@@ -393,7 +393,6 @@ def generate_emails_manager(customer_id, customer_email,startDate,endDate,langua
             messages.append(response.choices[0].message.content)
 
     return messages
-
 
 
 if __name__ == "__main__":
