@@ -11,7 +11,10 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelEncoder
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
-
+import requests
+import json
+import os
+from openai import OpenAI
 from starlette.responses import JSONResponse
 
 sales_doc = "../doccuments/sales_and_eodStocks.xlsx"
@@ -223,6 +226,119 @@ def get_predictions(product_id_to_predict,year,start_month,end_month):
             dates.append(date_str)
 
     return json.dumps({"dates" : dates, "predictions" : predictions})
+
+
+def create_prompter( product_id, amount, language, customer, description, customer_email, increase='increase'):
+    if customer:
+        if increase:
+            action = ""
+        else:
+            action = f"which has an decrese in price of the ammount of {amount} "
+    else:
+        action = "increase" if increase else "decrease"
+    if customer:
+        prompt = f"Create a short message which will be exported as JSON to tell a Client with email {customer_email} that based on his purchases he might be intersted in buying product with the product with this description: {description}, {action}%.The language of the message should be {language} :  Eg of an generated message in romanian : “Bună ziua Buyer Y,Având în vedere interesul dvs. anterior pentru Produsul Z, vă oferim un discount exclusiv de 15% valabil 48 de ore din momentul recepționării acestei notificări. Detalii suplimentare despre oferta noastră specială și despre produs pot fi găsite în aplicația mobilă RetailX, iar pentru comoditatea dvs., am trimis și un mesaj WhatsApp cu link direct către produs. De asemenea, puteți verifica emailul dvs. pentru mai multe informații"
+    else:
+        prompt = f"Create a short message which will be exported as JSON to tell a Shop Owner that his product with the product_Id of {product_id} has to {action} the stock of his product by {amount}%.The language of the message should be {language}:  Eg of an generated message in romanian : “Dragă Manager de Stoc X, Bazându-ne pe ultimele analize, vă sugerăm să ajustați stocul pentru Produsul Y. Recomandăm o creștere cu 20% a stocului, având în vedere tendințele de creștere ale cererii. Pentru a evita ruptura de stoc, sugerăm plasarea unei comenzi suplimentare în următoarele Z zile. Vă rugăm să verificați detaliile complete ale recomandării în dashboard-ul nostru de management al stocurilor. De asemenea, vă vom trimite un rezumat detaliat prin email și o alertă prin SMS pentru a asigura o acțiune promptă."
+    return prompt
+
+
+def query_openai(prompt, engine='gpt-3.5-turbo', max_tokens=100):
+    api_key = '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'  # Replace with your actual API key
+    client = OpenAI(api_key=api_key)
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo-1106",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": "You are a text generator which generates short messages (max: 500 characters) for the users based on their request"},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response
+
+def recommendation(customer_id, num_recommendations=5):
+    df = transactions_sales_df.copy()
+    df.dropna(inplace=True)
+
+    # Ensure correct data types (e.g., Customer_Id as string)
+    df['Customer ID'] = df['Customer ID'].astype(str)
+
+    # Normalize 'Price' column
+    scaler = MinMaxScaler()
+    df['Price'] = scaler.fit_transform(df[['Price']])
+
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.decomposition import PCA
+
+    # Extract features from 'Description'
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=100)
+    X = vectorizer.fit_transform(df['Description'])
+
+    # Reduce dimensions (optional, for better performance)
+    pca = PCA(n_components=20)
+    X_reduced = pca.fit_transform(X.toarray())
+
+
+    from sklearn.cluster import KMeans
+
+    # Cluster for category identification
+    kmeans = KMeans(n_clusters=10)
+    kmeans.fit(X_reduced)
+    df['category'] = kmeans.labels_
+
+
+    from sklearn.cluster import KMeans
+
+    # Aici modifica numarul de clusetere daca vrei sa ai mai multe categori posivilie penntru obiecte
+    kmeans = KMeans(n_clusters=10)
+    kmeans.fit(X_reduced)
+    df['category'] = kmeans.labels_
+
+    # Create user profiles by aggregating data
+    user_profile = df.groupby('Customer ID').agg({
+        'category': lambda x: x.mode()[0],  # Most common category
+        'Price': 'mean',  # Average spending
+    })
+
+    if customer_id not in user_profile.index:
+        print(f"Customer ID {customer_id} not found.")
+        return None
+
+    user_cat = user_profile.loc[customer_id, 'category']
+    similar_products = df[df['category'] == user_cat]
+
+    # Recommend products from the same category
+    recommendations = similar_products.sample(n=num_recommendations)
+    return recommendations['Product_ID']
+
+def get_product_name(id):
+    product_name = transactions_sales_df.loc[transactions_sales_df['Product_ID'] == id, 'Description'].iloc[0]
+    return product_name
+
+@app.get("/recommendation/{customer_id}")
+def get_product_recommendation(customer_id):
+    return recommendation(customer_id)
+
+
+@app.get("/recommendation/customer/{customer_id}/{customer_email}")
+def generate_emails_customer(customer_id, customer_email):
+    
+    messages = []
+    recs = recommendation(customer_id)
+    for key, value in recs.items():
+        print(value)
+        description = get_product_name(value)
+        print(description)
+        prompt = create_prompter(customer_id, 20, 'romanian', True, description, customer_email, False)
+        print(prompt)
+        response = query_openai(prompt)
+        print(response)
+        if response:
+            messages.append(response.choices[0].message.content)  
+
+    return messages
+
 
 
 if __name__ == "__main__":
